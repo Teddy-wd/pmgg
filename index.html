@@ -81,6 +81,7 @@
     .locked {
       pointer-events: none;
       opacity: 0.5;
+      filter: blur(3px);
     }
 
     /* ========== BUTTONS ========== */
@@ -110,7 +111,6 @@
       pointer-events: none;
       animation: confettiFall linear forwards;
     }
-
     @keyframes confettiFall {
       0% {
         transform: translateX(0) translateY(-10px);
@@ -159,7 +159,7 @@
     let userLevel = 1;
     let maxXP = xpThresholds[userLevel - 1]; 
 
-    // Colors for the XP bar, one per level
+    // Colors for the XP bar
     const barColors = [
       "#03dac5", // Level 1
       "#bb86fc", // Level 2
@@ -195,6 +195,27 @@
       18: 430
     };
 
+    const questPinsEncoded = {
+      1: "MjEyMQ==",
+      2: "MzQzNA==",
+      3: "NjU0Mw==",
+      4: "OTg3Ng==",
+      5: "MTI5OA==",
+      6: "NDQ2Ng==",
+      7: "MjI0NA==",
+      8: "NzUzMQ==",
+      9: "MTM0Ng==",
+      10: "OTUzMg==",
+      11: "NTU1NQ==",
+      12: "Nzc3Nw==",
+      13: "ODg4OA==",
+      14: "OTk5OQ==",
+      15: "NDU2Nw==",
+      16: "MzU3OQ==",
+      17: "OTg3MA==",
+      18: "MTExMA=="
+    };
+
     // Keep track of completed quests
     let completedQuests = [];
 
@@ -218,34 +239,26 @@
       }
     }
 
-    /**
-     * Confetti animation upon level up
-     */
     function showConfetti() {
       const count = 25;
       for (let i = 0; i < count; i++) {
         const confetti = document.createElement('div');
         confetti.classList.add('confetti');
         
-        // Random horizontal drift
         const xDrift = (Math.random() - 0.5) * 2 * 100; 
         confetti.style.setProperty('--confetti-x', `${xDrift}px`);
 
-        // Random color
         const hue = Math.floor(Math.random() * 360);
         confetti.style.backgroundColor = `hsl(${hue}, 70%, 50%)`;
 
-        // Random size
         const size = Math.floor(Math.random() * 8) + 8; 
         confetti.style.width = confetti.style.height = `${size}px`;
 
-        // Random timing
         const duration = (Math.random() * 1 + 2).toFixed(2); 
         confetti.style.animationDuration = `${duration}s`;
 
         document.body.appendChild(confetti);
 
-        // Remove after animation
         setTimeout(() => {
           confetti.remove();
         }, duration * 1000);
@@ -281,9 +294,6 @@
       }
     }
 
-    /**
-     * SAVE: Store currentXP, userLevel, and completedQuests in localStorage
-     */
     function saveProgress() {
       const saveData = {
         currentXP,
@@ -293,16 +303,11 @@
       localStorage.setItem('pmGrowthGameProgress', JSON.stringify(saveData));
     }
 
-    /**
-     * LOAD: Restore from localStorage if data exists
-     */
     function loadProgress() {
       const savedData = localStorage.getItem('pmGrowthGameProgress');
       if (savedData) {
         try {
           const { currentXP: xp, userLevel: lvl, completedQuests: cq } = JSON.parse(savedData);
-
-          // Restore XP & Level
           currentXP = xp || 0;
           userLevel = lvl || 1;
           if (userLevel - 1 < xpThresholds.length) {
@@ -311,7 +316,6 @@
             maxXP = Number.POSITIVE_INFINITY;
           }
 
-          // Restore completed quests
           completedQuests = cq || [];
           completedQuests.forEach((questId) => {
             const questElement = document.getElementById(`quest${questId}`);
@@ -320,8 +324,7 @@
             }
           });
 
-          // Unlock relevant quests
-          // We just unlock the next quest for each completed quest
+          // unlock next quest(s)
           completedQuests.forEach((questId) => {
             unlockNextQuest(questId);
           });
@@ -332,30 +335,48 @@
     }
 
     /**
-     * Mark quest complete, if not already.
-     * Then save progress.
+     * Show a prompt for the 4-digit pin and compare to the 
+     * Base64 decoded pin in questPinsEncoded.
      */
+    function verifyPinForQuest(questIndex) {
+      // decode the base64 to get the actual 4-digit PIN
+      const pin = atob(questPinsEncoded[questIndex]); 
+      const userPin = prompt("Please enter the 4-digit PIN to complete this quest:", "");
+
+      if (userPin === pin) {
+        return true; // correct
+      }
+      if (userPin !== null) {
+        alert("Incorrect PIN. Please try again.");
+      }
+      return false; // incorrect or canceled
+    }
+
     function toggleComplete(questId, questIndex) {
       const questElement = document.getElementById(questId);
 
-      if (!questElement.classList.contains('completed')) {
-        const xpGain = questXP[questIndex] || 50;
-        addXP(xpGain);
-        unlockNextQuest(questIndex);
-        questElement.classList.add('completed');
+      // already completed => do nothing
+      if (questElement.classList.contains('completed')) return;
 
-        // Mark quest as completed in array if not already
-        if (!completedQuests.includes(questIndex)) {
-          completedQuests.push(questIndex);
-        }
-        // Save progress after each completion
-        saveProgress();
+      // prompt for PIN
+      if (!verifyPinForQuest(questIndex)) {
+        return; // user didn't pass PIN check
       }
+
+      // if user typed correct PIN, award XP and unlock next quest
+      const xpGain = questXP[questIndex] || 50;
+      addXP(xpGain);
+      unlockNextQuest(questIndex);
+      questElement.classList.add('completed');
+
+      // Mark quest as completed in array if not already
+      if (!completedQuests.includes(questIndex)) {
+        completedQuests.push(questIndex);
+      }
+      // Save progress
+      saveProgress();
     }
 
-    /**
-     * On page load, restore saved progress, then update the XP bar display
-     */
     window.onload = function() {
       loadProgress();
       document.getElementById('levelDisplay').textContent = `Level ${userLevel}`;
@@ -376,6 +397,7 @@
 
   <!-- ======== QUESTS ======== -->
   <div class="container">
+    <!-- quest 1 -->
     <div class="quest" id="quest1">
       <h3>The Inner Circle</h3>
       <p>Convince 3 people to download the app, try it out, and provide feedback.</p>
@@ -383,6 +405,7 @@
       <button class="btn" onclick="toggleComplete('quest1', 1)">Mark as Complete</button>
     </div>
 
+    <!-- quest 2 -->
     <div class="quest locked" id="quest2">
       <h3>The Feedback Loop</h3>
       <p>Following the user test, organize the feedback into Loved it / Confused By It / Wanted More.</p>
@@ -390,6 +413,7 @@
       <button class="btn" onclick="toggleComplete('quest2', 2)">Mark as Complete</button>
     </div>
 
+    <!-- quest 3 -->
     <div class="quest locked" id="quest3">
       <h3>Spy on the Competition</h3>
       <p>Find and download a similar app, explore its features, and jot down what they’re doing well (and what’s annoying).</p>
@@ -397,6 +421,7 @@
       <button class="btn" onclick="toggleComplete('quest3', 3)">Mark as Complete</button>
     </div>
 
+    <!-- quest 4 -->
     <div class="quest locked" id="quest4">
       <h3>Social Media Sorcerer</h3>
       <p>Create a post about the app on your social media. Track engagement metrics.</p>
@@ -404,6 +429,7 @@
       <button class="btn" onclick="toggleComplete('quest4', 4)">Mark as Complete</button>
     </div>
 
+    <!-- quest 5 -->
     <div class="quest locked" id="quest5">
       <h3>The Local Detective</h3>
       <p>Visit a nearby café or restaurant. Try to figure out who the owner is and get their email address.</p>
@@ -411,6 +437,7 @@
       <button class="btn" onclick="toggleComplete('quest5', 5)">Mark as Complete</button>
     </div>
 
+    <!-- quest 6 -->
     <div class="quest locked" id="quest6">
       <h3>Food detective</h3>
       <p>Write down a small survey to send to the owner of the restaurant you managed to get details from.</p>
@@ -418,6 +445,7 @@
       <button class="btn" onclick="toggleComplete('quest6', 6)">Mark as Complete</button>
     </div>
 
+    <!-- quest 7 -->
     <div class="quest locked" id="quest7">
       <h3>Dream Big, Pitch Bigger</h3>
       <p>Propose one feature that could make the app go viral. Create a quick mockup or flow for the feature.</p>
@@ -425,6 +453,7 @@
       <button class="btn" onclick="toggleComplete('quest7', 7)">Mark as Complete</button>
     </div>
 
+    <!-- quest 8 -->
     <div class="quest locked" id="quest8">
       <h3>Feature Feud</h3>
       <p>Present the new feature ideas with the team and ask them to rank it by impact, feasibility, and fun.</p>
@@ -432,6 +461,7 @@
       <button class="btn" onclick="toggleComplete('quest8', 8)">Mark as Complete</button>
     </div>
 
+    <!-- quest 9 -->
     <div class="quest locked" id="quest9">
       <h3>Eureka Moment</h3>
       <p>Write a 30-second elevator pitch for the app, incorporating the new feature. Test it on at least 3 people.</p>
@@ -439,6 +469,7 @@
       <button class="btn" onclick="toggleComplete('quest9', 9)">Mark as Complete</button>
     </div>
 
+    <!-- quest 10 -->
     <div class="quest locked" id="quest10">
       <h3>Launch a Meme Campaign</h3>
       <p>Create 2-3 memes or short videos to promote the app with your feature. Share on social media or within your network.</p>
@@ -446,6 +477,7 @@
       <button class="btn" onclick="toggleComplete('quest10', 10)">Mark as Complete</button>
     </div>
 
+    <!-- quest 11 -->
     <div class="quest locked" id="quest11">
       <h3>Micro-Influencer Hunt</h3>
       <p>Identify 2-3 local food bloggers or Instagram influencers. DM them for an interview.</p>
@@ -453,6 +485,7 @@
       <button class="btn" onclick="toggleComplete('quest11', 11)">Mark as Complete</button>
     </div>
 
+    <!-- quest 12 -->
     <div class="quest locked" id="quest12">
       <h3>The Guerilla Marketer</h3>
       <p>Create a fun, offline promotional idea (stickers, QR codes, in or outside restaurants). Execute it!</p>
@@ -460,6 +493,7 @@
       <button class="btn" onclick="toggleComplete('quest12', 12)">Mark as Complete</button>
     </div>
 
+    <!-- quest 13 -->
     <div class="quest locked" id="quest13">
       <h3>Data Detective</h3>
       <p>Analyze app download stats, feedback trends, and social media metrics. Following all your initiatives.</p>
@@ -467,6 +501,7 @@
       <button class="btn" onclick="toggleComplete('quest13', 13)">Mark as Complete</button>
     </div>
 
+    <!-- quest 14 -->
     <div class="quest locked" id="quest14">
       <h3>The Pivot Master</h3>
       <p>Based on feedback, suggest a change or tweak in the app or strategy.</p>
@@ -474,6 +509,7 @@
       <button class="btn" onclick="toggleComplete('quest14', 14)">Mark as Complete</button>
     </div>
 
+    <!-- quest 15 -->
     <div class="quest locked" id="quest15">
       <h3>The Community Builder</h3>
       <p>Organize a mini-event (online or in-person) where users share their favorite recommendations via the app.</p>
@@ -481,6 +517,7 @@
       <button class="btn" onclick="toggleComplete('quest15', 15)">Mark as Complete</button>
     </div>
 
+    <!-- quest 16 -->
     <div class="quest locked" id="quest16">
       <h3>The Big Bang</h3>
       <p>Plan a creative stunt or campaign to drive a big spike in downloads in one week.</p>
@@ -488,6 +525,7 @@
       <button class="btn" onclick="toggleComplete('quest16', 16)">Mark as Complete</button>
     </div>
 
+    <!-- quest 17 -->
     <div class="quest locked" id="quest17">
       <h3>10k Club</h3>
       <p>Reach out to 5 local businesses to promote the app (with discounts or collaborations).</p>
@@ -495,6 +533,7 @@
       <button class="btn" onclick="toggleComplete('quest17', 17)">Mark as Complete</button>
     </div>
 
+    <!-- quest 18 -->
     <div class="quest locked" id="quest18">
       <h3>The Legacy Plan</h3>
       <p>Create a “Playbook” documenting what worked, what didn’t, and key learnings.</p>
