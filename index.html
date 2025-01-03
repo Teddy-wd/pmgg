@@ -135,176 +135,235 @@
       }
     }
   </style>
-<script>
-  /* ==========================
-     LEVEL & XP SYSTEM 
-     (with leftover XP & dynamic thresholds)
-     ========================== */
+  <script>
+    /* ==========================
+       LEVEL & XP SYSTEM 
+       (with leftover XP & dynamic thresholds)
+       ========================== */
 
-  // XP thresholds for each level
-  const xpThresholds = [
-    200,   // L1 -> L2
-    350,   // L2 -> L3
-    700,   // L3 -> L4
-    1100,  // L4 -> L5
-    1500,  // L5 -> L6
-    2000,  // L6 -> L7
-    2500,  // L7 -> L8
-    3000,  // L8 -> L9
-    3400,  // L9 -> L10
-    3820   // L10 -> L11 (final threshold if you want 10 levels total)
-  ];
+    // XP thresholds for each level
+    const xpThresholds = [
+      200,   // L1 -> L2
+      350,   // L2 -> L3
+      700,   // L3 -> L4
+      1100,  // L4 -> L5
+      1500,  // L5 -> L6
+      2000,  // L6 -> L7
+      2500,  // L7 -> L8
+      3000,  // L8 -> L9
+      3400,  // L9 -> L10
+      3820   // L10 -> L11 (final threshold if you want 10 levels total)
+    ];
 
-  let currentXP = 0;
-  let userLevel = 1;
-  let maxXP = xpThresholds[userLevel - 1]; 
+    let currentXP = 0;
+    let userLevel = 1;
+    let maxXP = xpThresholds[userLevel - 1]; 
 
-  // Colors for the XP bar, one per level
-  const barColors = [
-    "#03dac5", // Level 1
-    "#bb86fc", // Level 2
-    "#ff5722", // Level 3
-    "#fecc00", // Level 4
-    "#3700b3", // Level 5
-    "#009688", // Level 6
-    "#795548", // Level 7
-    "#8bc34a", // Level 8
-    "#e91e63", // Level 9
-    "#607d8b"  // Level 10
-  ];
+    // Colors for the XP bar, one per level
+    const barColors = [
+      "#03dac5", // Level 1
+      "#bb86fc", // Level 2
+      "#ff5722", // Level 3
+      "#fecc00", // Level 4
+      "#3700b3", // Level 5
+      "#009688", // Level 6
+      "#795548", // Level 7
+      "#8bc34a", // Level 8
+      "#e91e63", // Level 9
+      "#607d8b"  // Level 10
+    ];
 
-  // XP awards per quest
-  const questXP = {
-    1: 100,
-    2: 120,
-    3: 150,
-    4: 130,
-    5: 140,
-    6: 160,
-    7: 200,
-    8: 180,
-    9: 220,
-    10: 250,
-    11: 180,
-    12: 200,
-    13: 220,
-    14: 240,
-    15: 280,
-    16: 300,
-    17: 350,
-    18: 430
-  };
+    // XP awards per quest
+    const questXP = {
+      1: 100,
+      2: 120,
+      3: 150,
+      4: 130,
+      5: 140,
+      6: 160,
+      7: 200,
+      8: 180,
+      9: 220,
+      10: 250,
+      11: 180,
+      12: 200,
+      13: 220,
+      14: 240,
+      15: 280,
+      16: 300,
+      17: 350,
+      18: 430
+    };
 
-  function updateXPBar() {
-    const xpBar = document.querySelector('.xp-bar-inner');
-    const xpMissing = document.getElementById('xpMissing');
+    // Keep track of completed quests
+    let completedQuests = [];
 
-    const percentage = Math.min((currentXP / maxXP) * 100, 100);
-    xpBar.style.width = percentage + '%';
+    function updateXPBar() {
+      const xpBar = document.querySelector('.xp-bar-inner');
+      const xpMissing = document.getElementById('xpMissing');
 
-    // Color
-    const colorIndex = (userLevel - 1) % barColors.length;
-    xpBar.style.backgroundColor = barColors[colorIndex];
+      const percentage = Math.min((currentXP / maxXP) * 100, 100);
+      xpBar.style.width = percentage + '%';
 
-    // XP left
-    if (currentXP < maxXP) {
-      const xpLeft = maxXP - currentXP;
-      xpMissing.textContent = `${xpLeft} XP left to reach Level ${userLevel + 1}!`;
-    } else {
-      xpMissing.textContent = `Level up available!`;
+      // Color
+      const colorIndex = (userLevel - 1) % barColors.length;
+      xpBar.style.backgroundColor = barColors[colorIndex];
+
+      // XP left
+      if (currentXP < maxXP) {
+        const xpLeft = maxXP - currentXP;
+        xpMissing.textContent = `${xpLeft} XP left to reach Level ${userLevel + 1}!`;
+      } else {
+        xpMissing.textContent = `Level up available!`;
+      }
     }
-  }
 
-  /**
-   * Confetti animation upon level up
-   * (creates small confetti squares that fall)
-   */
-  function showConfetti() {
-    // Number of confetti pieces
-    const count = 25;
-    for (let i = 0; i < count; i++) {
-      const confetti = document.createElement('div');
-      confetti.classList.add('confetti');
-      
-      // Random horizontal drift
-      const xDrift = (Math.random() - 0.5) * 2 * 100; // up to +/-100px
-      confetti.style.setProperty('--confetti-x', `${xDrift}px`);
+    /**
+     * Confetti animation upon level up
+     */
+    function showConfetti() {
+      const count = 25;
+      for (let i = 0; i < count; i++) {
+        const confetti = document.createElement('div');
+        confetti.classList.add('confetti');
+        
+        // Random horizontal drift
+        const xDrift = (Math.random() - 0.5) * 2 * 100; 
+        confetti.style.setProperty('--confetti-x', `${xDrift}px`);
 
-      // Random color
-      const hue = Math.floor(Math.random() * 360);
-      confetti.style.backgroundColor = `hsl(${hue}, 70%, 50%)`;
+        // Random color
+        const hue = Math.floor(Math.random() * 360);
+        confetti.style.backgroundColor = `hsl(${hue}, 70%, 50%)`;
 
-      // Random size
-      const size = Math.floor(Math.random() * 8) + 8; 
-      confetti.style.width = confetti.style.height = `${size}px`;
+        // Random size
+        const size = Math.floor(Math.random() * 8) + 8; 
+        confetti.style.width = confetti.style.height = `${size}px`;
 
-      // Random timing
-      const duration = (Math.random() * 1 + 2).toFixed(2); // between 2s - 3s
-      confetti.style.animationDuration = `${duration}s`;
+        // Random timing
+        const duration = (Math.random() * 1 + 2).toFixed(2); 
+        confetti.style.animationDuration = `${duration}s`;
 
-      document.body.appendChild(confetti);
+        document.body.appendChild(confetti);
 
-      // Remove the confetti element after the animation
-      setTimeout(() => {
-        confetti.remove();
-      }, duration * 1000);
+        // Remove after animation
+        setTimeout(() => {
+          confetti.remove();
+        }, duration * 1000);
+      }
     }
-  }
 
-  function levelUp() {
-    userLevel++;
-    document.getElementById('levelDisplay').textContent = `Level ${userLevel}`;
+    function levelUp() {
+      userLevel++;
+      document.getElementById('levelDisplay').textContent = `Level ${userLevel}`;
+      showConfetti();
 
-    // Confetti animation
-    showConfetti();
-
-    // Next XP threshold
-    if (userLevel - 1 < xpThresholds.length) {
-      maxXP = xpThresholds[userLevel - 1];
-    } else {
-      // Reached final threshold
-      maxXP = Number.POSITIVE_INFINITY;
+      if (userLevel - 1 < xpThresholds.length) {
+        maxXP = xpThresholds[userLevel - 1];
+      } else {
+        maxXP = Number.POSITIVE_INFINITY;
+      }
     }
-  }
 
-  function addXP(xp) {
-    currentXP += xp;
-    // If user crosses threshold, leftover XP & level up
-    while (currentXP >= maxXP && userLevel - 1 < xpThresholds.length) {
-      const leftover = currentXP - maxXP;
-      levelUp();
-      currentXP = leftover;
+    function addXP(xp) {
+      currentXP += xp;
+      while (currentXP >= maxXP && userLevel - 1 < xpThresholds.length) {
+        const leftover = currentXP - maxXP;
+        levelUp();
+        currentXP = leftover;
+      }
+      updateXPBar();
     }
-    updateXPBar();
-  }
 
-  function unlockNextQuest(questIndex) {
-    const nextQuest = document.getElementById(`quest${questIndex + 1}`);
-    if (nextQuest) {
-      nextQuest.classList.remove('locked');
+    function unlockNextQuest(questIndex) {
+      const nextQuest = document.getElementById(`quest${questIndex + 1}`);
+      if (nextQuest) {
+        nextQuest.classList.remove('locked');
+      }
     }
-  }
 
-  /**
-   * Once a quest is completed, it CANNOT be undone.
-   * We only .add() the 'completed' class (instead of toggling).
-   * The button no longer toggles, it just marks it once.
-   */
-  function toggleComplete(questId, questIndex) {
-    const questElement = document.getElementById(questId);
-
-    if (!questElement.classList.contains('completed')) {
-      // Award XP if quest not yet completed
-      const xpGain = questXP[questIndex] || 50;
-      addXP(xpGain);
-      unlockNextQuest(questIndex);
-      questElement.classList.add('completed');
+    /**
+     * SAVE: Store currentXP, userLevel, and completedQuests in localStorage
+     */
+    function saveProgress() {
+      const saveData = {
+        currentXP,
+        userLevel,
+        completedQuests
+      };
+      localStorage.setItem('pmGrowthGameProgress', JSON.stringify(saveData));
     }
-    // If it's already completed, do nothing (can't undo).
-  }
-</script>
+
+    /**
+     * LOAD: Restore from localStorage if data exists
+     */
+    function loadProgress() {
+      const savedData = localStorage.getItem('pmGrowthGameProgress');
+      if (savedData) {
+        try {
+          const { currentXP: xp, userLevel: lvl, completedQuests: cq } = JSON.parse(savedData);
+
+          // Restore XP & Level
+          currentXP = xp || 0;
+          userLevel = lvl || 1;
+          if (userLevel - 1 < xpThresholds.length) {
+            maxXP = xpThresholds[userLevel - 1];
+          } else {
+            maxXP = Number.POSITIVE_INFINITY;
+          }
+
+          // Restore completed quests
+          completedQuests = cq || [];
+          completedQuests.forEach((questId) => {
+            const questElement = document.getElementById(`quest${questId}`);
+            if (questElement) {
+              questElement.classList.add('completed');
+            }
+          });
+
+          // Unlock relevant quests
+          // We just unlock the next quest for each completed quest
+          completedQuests.forEach((questId) => {
+            unlockNextQuest(questId);
+          });
+        } catch (err) {
+          console.error('Error loading saved progress:', err);
+        }
+      }
+    }
+
+    /**
+     * Mark quest complete, if not already.
+     * Then save progress.
+     */
+    function toggleComplete(questId, questIndex) {
+      const questElement = document.getElementById(questId);
+
+      if (!questElement.classList.contains('completed')) {
+        const xpGain = questXP[questIndex] || 50;
+        addXP(xpGain);
+        unlockNextQuest(questIndex);
+        questElement.classList.add('completed');
+
+        // Mark quest as completed in array if not already
+        if (!completedQuests.includes(questIndex)) {
+          completedQuests.push(questIndex);
+        }
+        // Save progress after each completion
+        saveProgress();
+      }
+    }
+
+    /**
+     * On page load, restore saved progress, then update the XP bar display
+     */
+    window.onload = function() {
+      loadProgress();
+      document.getElementById('levelDisplay').textContent = `Level ${userLevel}`;
+      updateXPBar();
+    };
+  </script>
 </head>
-<body onload="updateXPBar()">
+<body>
   <!-- ======== STICKY HEADER (includes XP bar) ======== -->
   <header>
     <h1>Product Manager Growth Game</h1>
@@ -333,7 +392,7 @@
 
     <div class="quest locked" id="quest3">
       <h3>Spy on the Competition</h3>
-      <p>Find and Download a similar app, explore its features, and jot down what they’re doing well (and what’s annoying).</p>
+      <p>Find and download a similar app, explore its features, and jot down what they’re doing well (and what’s annoying).</p>
       <p class="bonus">Bonus: Suggest one improvement based on your findings.</p>
       <button class="btn" onclick="toggleComplete('quest3', 3)">Mark as Complete</button>
     </div>
