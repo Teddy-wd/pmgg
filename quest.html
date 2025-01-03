@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Product Manager Growth Game</title>
+  <style>
+    /* ========== STICKY HEADER ========== */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 999;
+      background-color: #1e1e1e;
+      color: #bb86fc;
+      text-align: center;
+      padding: 1em 0 0.75em;
+    }
+
+    /* Body padding so content isn't hidden behind the fixed header */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #121212;
+      color: #e0e0e0;
+    }
+
+    /* ========== XP BAR ========== */
+    .xp-bar {
+      background-color: #333;
+      border: 1px solid #444;
+      border-radius: 10px;
+      margin: 10px auto;
+      height: 20px;
+      width: 80%;
+      position: relative;
+      overflow: hidden;
+      max-width: 800px;
+    }
+    .xp-bar-inner {
+      height: 100%;
+      width: 0%;
+      transition: width 0.5s;
+      background-color: #03dac5;
+    }
+    #xpMissing {
+      position: absolute;
+      right: 10px;
+      top: 0;
+      font-size: 12px;
+      line-height: 20px;
+    }
+
+    /* ========== CONTAINER & QUEST STYLES ========== */
+    .container {
+      padding: 20px;
+      max-width: 800px;
+      margin: 150px auto 0 auto;
+    }
+    .quest {
+      background-color: #1e1e1e;
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+    }
+    .quest h3 {
+      margin-top: 0;
+    }
+    .quest .bonus {
+      font-style: italic;
+      color: #03dac5;
+    }
+    .completed {
+      text-decoration: line-through;
+      opacity: 0.7;
+    }
+    .locked {
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* ========== BUTTONS ========== */
+    .btn {
+      display: inline-block;
+      padding: 10px 20px;
+      margin-top: 10px;
+      background-color: #bb86fc;
+      color: #121212;
+      text-decoration: none;
+      border-radius: 5px;
+      cursor: pointer;
+      border: none;
+    }
+    .btn:hover {
+      background-color: #3700b3;
+    }
+
+    /* ========== CONFETTI ========== */
+    .confetti {
+      position: fixed;
+      width: 100px;
+      height: 100px;
+      top: 0;
+      left: 50%;
+      opacity: 0.9;
+      pointer-events: none;
+      animation: confettiFall linear forwards;
+    }
+
+    @keyframes confettiFall {
+      0% {
+        transform: translateX(0) translateY(-10px);
+      }
+      100% {
+        transform: translateX(var(--confetti-x, 0)) translateY(100vh);
+        opacity: 0;
+      }
+    }
+
+    /* ========== RESPONSIVE / MEDIA QUERIES ========== */
+    @media (max-width: 600px) {
+      header {
+        padding: 0.75em 0.5em;
+      }
+      .xp-bar {
+        width: 90%;
+      }
+      .btn {
+        width: 100%;
+        margin-top: 15px;
+      }
+    }
+  </style>
+<script>
+  /* ==========================
+     LEVEL & XP SYSTEM 
+     (with leftover XP & dynamic thresholds)
+     ========================== */
+
+  // XP thresholds for each level
+  const xpThresholds = [
+    200,   // L1 -> L2
+    350,   // L2 -> L3
+    700,   // L3 -> L4
+    1100,  // L4 -> L5
+    1500,  // L5 -> L6
+    2000,  // L6 -> L7
+    2500,  // L7 -> L8
+    3000,  // L8 -> L9
+    3400,  // L9 -> L10
+    3820   // L10 -> L11 (final threshold if you want 10 levels total)
+  ];
+
+  let currentXP = 0;
+  let userLevel = 1;
+  let maxXP = xpThresholds[userLevel - 1]; 
+
+  // Colors for the XP bar, one per level
+  const barColors = [
+    "#03dac5", // Level 1
+    "#bb86fc", // Level 2
+    "#ff5722", // Level 3
+    "#fecc00", // Level 4
+    "#3700b3", // Level 5
+    "#009688", // Level 6
+    "#795548", // Level 7
+    "#8bc34a", // Level 8
+    "#e91e63", // Level 9
+    "#607d8b"  // Level 10
+  ];
+
+  // XP awards per quest
+  const questXP = {
+    1: 100,
+    2: 120,
+    3: 150,
+    4: 130,
+    5: 140,
+    6: 160,
+    7: 200,
+    8: 180,
+    9: 220,
+    10: 250,
+    11: 180,
+    12: 200,
+    13: 220,
+    14: 240,
+    15: 280,
+    16: 300,
+    17: 350,
+    18: 430
+  };
+
+  function updateXPBar() {
+    const xpBar = document.querySelector('.xp-bar-inner');
+    const xpMissing = document.getElementById('xpMissing');
+
+    const percentage = Math.min((currentXP / maxXP) * 100, 100);
+    xpBar.style.width = percentage + '%';
+
+    // Color
+    const colorIndex = (userLevel - 1) % barColors.length;
+    xpBar.style.backgroundColor = barColors[colorIndex];
+
+    // XP left
+    if (currentXP < maxXP) {
+      const xpLeft = maxXP - currentXP;
+      xpMissing.textContent = `${xpLeft} XP left to reach Level ${userLevel + 1}!`;
+    } else {
+      xpMissing.textContent = `Level up available!`;
+    }
+  }
+
+  /**
+   * Confetti animation upon level up
+   * (creates small confetti squares that fall)
+   */
+  function showConfetti() {
+    // Number of confetti pieces
+    const count = 25;
+    for (let i = 0; i < count; i++) {
+      const confetti = document.createElement('div');
+      confetti.classList.add('confetti');
+      
+      // Random horizontal drift
+      const xDrift = (Math.random() - 0.5) * 2 * 100; // up to +/-100px
+      confetti.style.setProperty('--confetti-x', `${xDrift}px`);
+
+      // Random color
+      const hue = Math.floor(Math.random() * 360);
+      confetti.style.backgroundColor = `hsl(${hue}, 70%, 50%)`;
+
+      // Random size
+      const size = Math.floor(Math.random() * 8) + 8; 
+      confetti.style.width = confetti.style.height = `${size}px`;
+
+      // Random timing
+      const duration = (Math.random() * 1 + 2).toFixed(2); // between 2s - 3s
+      confetti.style.animationDuration = `${duration}s`;
+
+      document.body.appendChild(confetti);
+
+      // Remove the confetti element after the animation
+      setTimeout(() => {
+        confetti.remove();
+      }, duration * 1000);
+    }
+  }
+
+  function levelUp() {
+    userLevel++;
+    document.getElementById('levelDisplay').textContent = `Level ${userLevel}`;
+
+    // Confetti animation
+    showConfetti();
+
+    // Next XP threshold
+    if (userLevel - 1 < xpThresholds.length) {
+      maxXP = xpThresholds[userLevel - 1];
+    } else {
+      // Reached final threshold
+      maxXP = Number.POSITIVE_INFINITY;
+    }
+  }
+
+  function addXP(xp) {
+    currentXP += xp;
+    // If user crosses threshold, leftover XP & level up
+    while (currentXP >= maxXP && userLevel - 1 < xpThresholds.length) {
+      const leftover = currentXP - maxXP;
+      levelUp();
+      currentXP = leftover;
+    }
+    updateXPBar();
+  }
+
+  function unlockNextQuest(questIndex) {
+    const nextQuest = document.getElementById(`quest${questIndex + 1}`);
+    if (nextQuest) {
+      nextQuest.classList.remove('locked');
+    }
+  }
+
+  /**
+   * Once a quest is completed, it CANNOT be undone.
+   * We only .add() the 'completed' class (instead of toggling).
+   * The button no longer toggles, it just marks it once.
+   */
+  function toggleComplete(questId, questIndex) {
+    const questElement = document.getElementById(questId);
+
+    if (!questElement.classList.contains('completed')) {
+      // Award XP if quest not yet completed
+      const xpGain = questXP[questIndex] || 50;
+      addXP(xpGain);
+      unlockNextQuest(questIndex);
+      questElement.classList.add('completed');
+    }
+    // If it's already completed, do nothing (can't undo).
+  }
+</script>
+</head>
+<body onload="updateXPBar()">
+  <!-- ======== STICKY HEADER (includes XP bar) ======== -->
+  <header>
+    <h1>Product Manager Growth Game</h1>
+    <p id="levelDisplay">Level 1</p>
+    <div class="xp-bar">
+      <div class="xp-bar-inner"></div>
+      <div id="xpMissing">0 XP left to reach Level 2!</div>
+    </div>
+  </header>
+
+  <!-- ======== QUESTS ======== -->
+  <div class="container">
+    <div class="quest" id="quest1">
+      <h3>The Inner Circle</h3>
+      <p>Convince 3 people to download the app, try it out, and provide feedback.</p>
+      <p class="bonus">Tips: It can be strangers, friends or family.</p>
+      <button class="btn" onclick="toggleComplete('quest1', 1)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest2">
+      <h3>The Feedback Loop</h3>
+      <p>Following the user test, organize the feedback into Loved it / Confused By It / Wanted More.</p>
+      <p class="bonus">Tips: Use the categories to orient your questions</p>
+      <button class="btn" onclick="toggleComplete('quest2', 2)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest3">
+      <h3>Spy on the Competition</h3>
+      <p>Find and Download a similar app, explore its features, and jot down what they’re doing well (and what’s annoying).</p>
+      <p class="bonus">Bonus: Suggest one improvement based on your findings.</p>
+      <button class="btn" onclick="toggleComplete('quest3', 3)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest4">
+      <h3>Social Media Sorcerer</h3>
+      <p>Create a post about the app on your social media. Track engagement metrics.</p>
+      <p class="bonus">Tips: You can pick any social media of your choice.</p>
+      <button class="btn" onclick="toggleComplete('quest4', 4)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest5">
+      <h3>The Local Detective</h3>
+      <p>Visit a nearby café or restaurant. Try to figure out who the owner is and get their email address.</p>
+      <p class="bonus">Tips: Explain that you work for a food oriented platform and would like to send a short survey.</p>
+      <button class="btn" onclick="toggleComplete('quest5', 5)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest6">
+      <h3>Food detective</h3>
+      <p>Write down a small survey to send to the owner of the restaurant you managed to get details from.</p>
+      <p class="bonus">Tips: No more than 5 questions.</p>
+      <button class="btn" onclick="toggleComplete('quest6', 6)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest7">
+      <h3>Dream Big, Pitch Bigger</h3>
+      <p>Propose one feature that could make the app go viral. Create a quick mockup or flow for the feature.</p>
+      <p class="bonus">Bonus: Get feedback from at least 2 non-team members.</p>
+      <button class="btn" onclick="toggleComplete('quest7', 7)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest8">
+      <h3>Feature Feud</h3>
+      <p>Present the new feature ideas with the team and ask them to rank it by impact, feasibility, and fun.</p>
+      <p class="bonus">Tips: It can be done async with a vote via emojis.</p>
+      <button class="btn" onclick="toggleComplete('quest8', 8)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest9">
+      <h3>Eureka Moment</h3>
+      <p>Write a 30-second elevator pitch for the app, incorporating the new feature. Test it on at least 3 people.</p>
+      <p class="bonus">Challenge: Get someone to say, "Wow, that’s cool!"</p>
+      <button class="btn" onclick="toggleComplete('quest9', 9)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest10">
+      <h3>Launch a Meme Campaign</h3>
+      <p>Create 2-3 memes or short videos to promote the app with your feature. Share on social media or within your network.</p>
+      <p class="bonus">Tips: Post at a peak time and track engagement.</p>
+      <button class="btn" onclick="toggleComplete('quest10', 10)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest11">
+      <h3>Micro-Influencer Hunt</h3>
+      <p>Identify 2-3 local food bloggers or Instagram influencers. DM them for an interview.</p>
+      <p class="bonus">Tips: Explain that you work for a food oriented platform.</p>
+      <button class="btn" onclick="toggleComplete('quest11', 11)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest12">
+      <h3>The Guerilla Marketer</h3>
+      <p>Create a fun, offline promotional idea (stickers, QR codes, in or outside restaurants). Execute it!</p>
+      <p class="bonus">Bonus: Document reactions or results.</p>
+      <button class="btn" onclick="toggleComplete('quest12', 12)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest13">
+      <h3>Data Detective</h3>
+      <p>Analyze app download stats, feedback trends, and social media metrics. Following all your initiatives.</p>
+      <p class="bonus">Challenge: Propose one data-driven action plan.</p>
+      <button class="btn" onclick="toggleComplete('quest13', 13)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest14">
+      <h3>The Pivot Master</h3>
+      <p>Based on feedback, suggest a change or tweak in the app or strategy.</p>
+      <p class="bonus">Bonus: Get it implemented (or at least approved).</p>
+      <button class="btn" onclick="toggleComplete('quest14', 14)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest15">
+      <h3>The Community Builder</h3>
+      <p>Organize a mini-event (online or in-person) where users share their favorite recommendations via the app.</p>
+      <p class="bonus">Tips: Capture testimonials.</p>
+      <button class="btn" onclick="toggleComplete('quest15', 15)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest16">
+      <h3>The Big Bang</h3>
+      <p>Plan a creative stunt or campaign to drive a big spike in downloads in one week.</p>
+      <p class="bonus">Bonus XP: Get the team involved for a collaborative finale.</p>
+      <button class="btn" onclick="toggleComplete('quest16', 16)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest17">
+      <h3>10k Club</h3>
+      <p>Reach out to 5 local businesses to promote the app (with discounts or collaborations).</p>
+      <p class="bonus">Bonus XP: Get a partnership in place.</p>
+      <button class="btn" onclick="toggleComplete('quest17', 17)">Mark as Complete</button>
+    </div>
+
+    <div class="quest locked" id="quest18">
+      <h3>The Legacy Plan</h3>
+      <p>Create a “Playbook” documenting what worked, what didn’t, and key learnings.</p>
+      <p class="bonus">Bonus XP: Make it visually engaging (use Canva, illustrations, etc.).</p>
+      <button class="btn" onclick="toggleComplete('quest18', 18)">Mark as Complete</button>
+    </div>
+  </div>
+</body>
+</html>
